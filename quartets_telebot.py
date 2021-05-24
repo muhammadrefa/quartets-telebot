@@ -1,11 +1,26 @@
 import configparser
 
-from telegram import Update, error, ParseMode
+from string import Template
+from telegram import Update, error, ParseMode, Bot
 from telegram.ext import Updater, CommandHandler, CallbackContext
 from quartets import Quartets, Quartets_GameState, dek_kartu, dek_baru
 
 games = dict()
 admin_id = 0
+
+
+def change_game_placeholder(bot: Bot, msg: Template, gamedata: dict) -> str:
+    data = dict()
+    for key in gamedata:
+        if gamedata[key] not in data:
+            data[gamedata[key]] = bot.getChat(gamedata[key])
+        if "GROUPNAME" in key:
+            gamedata[key] = data[gamedata[key]].title
+        elif "USERNAME" in key:
+            gamedata[key] = data[gamedata[key]].username
+        elif "NAME" in key:
+            gamedata[key] = data[gamedata[key]].full_name
+    return msg.safe_substitute(gamedata)
 
 
 def escape_for_markdown(msg: str) -> str:
@@ -16,8 +31,11 @@ def escape_for_markdown(msg: str) -> str:
     return new_msg
 
 
-def quartets_cards_msg(deck: dict, userdata: dict) -> str:
-    msg = "Card data\n\n"
+def quartets_cards_msg(deck: dict, userdata: dict, game_id: int = None) -> str:
+    msg = str()
+    if game_id is not None:
+        msg += f'Game ID: {game_id}\nGroup: $GROUPNAME\n\n'
+    msg += "Card data\n\n"
     for group in deck:
         if group in userdata['cards']:
             msg += f'*{group}*\n'
@@ -51,18 +69,25 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
             #     msglist.append({"type": "group", "content": "Game not started yet"})
 
             if games[game_id].state is Quartets_GameState.CHOOSE_GROUP:
-                msg = f'Current player: {games[game_id].player_turns[games[game_id].idx_current_player_turn]}'
-                msglist.append({"type": "group", "content": msg})
+                player_id = games[game_id].player_turns[games[game_id].idx_current_player_turn]
+                msg = f'Current player: $NAME1 (@$USERNAME1 {player_id})'
+                msglist.append({
+                    "type": "group",
+                    "content": Template(msg),
+                    "gamedata": {"NAME1": player_id, "USERNAME1": player_id, "ID1": player_id}
+                })
 
                 try:
                     # print("Players data")
                     # print(result["result"]["status"])
                     for player_id in result["result"]["status"]:
-                        msg = f'Game ID : {game_id}\n\n'
-                        msg += quartets_cards_msg(games[game_id].deck, result["result"]["status"][player_id])
-                        msglist.append(
-                            {"type": "private", "destination": int(player_id),
-                             "content": msg})
+                        msg = quartets_cards_msg(games[game_id].deck, result["result"]["status"][player_id], game_id=game_id)
+                        msglist.append({
+                            "type": "private",
+                            "destination": int(player_id),
+                            "content": Template(msg),
+                            "gamedata": {"GROUPNAME": game_id}
+                        })
                 except KeyError:
                     pass
 
@@ -71,11 +96,18 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
                 msglist.append({"type": "group", "content": msg})
 
             elif games[game_id].state is Quartets_GameState.CHOOSE_PLAYER:
+                gamedata = dict()
                 msg = "Owners :\n"
-                for k in result["result"]["owner"]:
-                    msg += f'{k}\n'
+                for i, k in enumerate(result["result"]["owner"]):
+                    msg += f'$NAME{str(i)} ($USERNAME{str(i)} {k})\n'
+                    gamedata["NAME" + str(i)] = k
+                    gamedata["USERNAME" + str(i)] = k
                 msg += f'\nSelect target player by using this command\n\n/ask target <owner id>'
-                msglist.append({"type": "group", "content": msg})
+                msglist.append({
+                    "type": "group",
+                    "content": Template(msg),
+                    "gamedata": gamedata
+                })
 
             elif games[game_id].state is Quartets_GameState.CHOOSE_CARD:
                 msg = f'Select card to ask using this command\n\n/ask cardname <card name>'
@@ -87,11 +119,13 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
 
                 try:
                     for player_id in result["result"]["status"]:
-                        msg = f'Game ID : {game_id}\n\n'
-                        msg += quartets_cards_msg(games[game_id].deck, result["result"]["status"][player_id])
-                        msglist.append(
-                            {"type": "private", "destination": int(player_id),
-                             "content": msg})
+                        msg = quartets_cards_msg(games[game_id].deck, result["result"]["status"][player_id], game_id=game_id)
+                        msglist.append({
+                            "type": "private",
+                            "destination": int(player_id),
+                            "content": Template(msg),
+                            "gamedata": {"GROUPNAME": game_id}
+                        })
                 except KeyError:
                     pass
 
@@ -118,8 +152,13 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
                 del games[game_id]
 
     else:
-        msglist.append({"type": "group", "content":
-            f'Not your turn! ({games[game_id].player_turns[games[game_id].idx_current_player_turn]}\'s turn)'})
+        player_id = games[game_id].player_turns[games[game_id].idx_current_player_turn]
+        msg = f'Not your turn! ($NAME\'s turn) (User ID {player_id})'
+        msglist.append({
+            "type": "group",
+            "content": Template(msg),
+            "gamedata": {"NAME": player_id}
+        })
     return msglist
 
 
@@ -134,13 +173,25 @@ def hi(update: Update, context: CallbackContext) -> None:
 
 def newgame(update: Update, context: CallbackContext) -> None:
     if update.effective_chat.id == update.effective_user.id:
-        context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Game not created! Don\'t do it privately!')
+        context.bot.sendMessage(
+            chat_id=update.effective_chat.id,
+            reply_to_message_id=update.message.message_id,
+            text=f'Game not created! Don\'t do it privately!'
+        )
     elif update.effective_chat.id not in games:
         games[update.effective_chat.id] = Quartets(dek_baru)
-        context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'New game created')
+        context.bot.sendMessage(
+            chat_id=update.effective_chat.id,
+            reply_to_message_id=update.message.message_id,
+            text=f'New game created'
+        )
         join(update, context)
     else:
-        context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Game exist!')
+        context.bot.sendMessage(
+            chat_id=update.effective_chat.id,
+            reply_to_message_id=update.message.message_id,
+            text=f'Game exist!'
+        )
     # print("new :: Games", games)
 
 
@@ -149,37 +200,62 @@ def join(update: Update, context: CallbackContext) -> None:
         context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Create new game first!')
     else:
         if str(update.effective_user.id) in games[update.effective_chat.id].player_turns:
-            context.bot.sendMessage(chat_id=update.effective_chat.id,
-                                    text=f'{update.effective_user.first_name} ({update.effective_user.id}) already joined!')
+            context.bot.sendMessage(
+                chat_id=update.effective_chat.id,
+                reply_to_message_id=update.message.message_id,
+                text=f'{update.effective_user.first_name} ({update.effective_user.id}) already joined!'
+            )
         elif len(games[update.effective_chat.id].player_turns) >= len(dek_baru) - 2:
-            context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Sorry, too many players!')
+            context.bot.sendMessage(
+                chat_id=update.effective_chat.id,
+                reply_to_message_id=update.message.message_id,
+                text=f'Sorry, too many players!'
+            )
         else:
             try:
-                context.bot.sendMessage(chat_id=update.effective_user.id,
-                                        text=f'Thanks for your interest to join the game in {update.effective_chat.title} group')
+                context.bot.sendMessage(
+                    chat_id=update.effective_user.id,
+                    text=f'Thanks for your interest to join the game in {update.effective_chat.title} group'
+                )
+
+                if games[update.effective_chat.id].add_player(str(update.effective_user.id)):
+                    # Send card data
+                    if games[update.effective_chat.id].state != Quartets_GameState.NOT_STARTED:
+                        carddata = {
+                            "cards": games[update.effective_chat.id].players[str(update.effective_user.id)].cards,
+                            "group_finished": games[update.effective_chat.id].players[
+                                str(update.effective_user.id)].group_finished,
+                        }
+                        msg = quartets_cards_msg(games[update.effective_chat.id].deck, carddata, game_id=update.effective_chat.id)
+                        context.bot.sendMessage(chat_id=update.effective_user.id, text=escape_for_markdown(msg),
+                                                parse_mode=ParseMode.MARKDOWN_V2)
+                    context.bot.sendMessage(
+                        chat_id=update.effective_chat.id,
+                        reply_to_message_id=update.message.message_id,
+                        text=f'{update.effective_user.first_name} ({update.effective_user.id}) joined'
+                    )
+                    msg_turns = "Player turns :\n"
+                    turns_data = dict()
+                    for i, player_id in enumerate(games[update.effective_chat.id].player_turns):
+                        msg_turns += f'- $NAME{str(i)} ($USERNAME{str(i)} {player_id})\n'
+                        turns_data["NAME" + str(i)] = player_id
+                        turns_data["USERNAME" + str(i)] = player_id
+                    context.bot.sendMessage(
+                        chat_id=update.effective_chat.id,
+                        text=change_game_placeholder(context.bot, Template(msg_turns), turns_data)
+                    )
+                else:
+                    context.bot.sendMessage(
+                        chat_id=update.effective_chat.id,
+                        reply_to_message_id=update.message.message_id,
+                        text=f'Sorry {update.effective_user.first_name} ({update.effective_user.id}), you can\'t join the game right now'
+                    )
             except error.Unauthorized:
-                context.bot.sendMessage(chat_id=update.effective_chat.id,
-                                        text=f'{update.effective_user.first_name}, please chat the bot first before joining to make sure the bot works properly')
-            if games[update.effective_chat.id].add_player(str(update.effective_user.id)):
-                # Send card data
-                if games[update.effective_chat.id].state != Quartets_GameState.NOT_STARTED:
-                    msg = f'Game ID : {update.effective_chat.id}\n\n'
-                    carddata = {
-                        "cards": games[update.effective_chat.id].players[str(update.effective_user.id)].cards,
-                        "group_finished": games[update.effective_chat.id].players[str(update.effective_user.id)].group_finished,
-                    }
-                    msg += quartets_cards_msg(games[update.effective_chat.id].deck, carddata)
-                    context.bot.sendMessage(chat_id=update.effective_user.id, text=escape_for_markdown(msg),
-                                            parse_mode=ParseMode.MARKDOWN_V2)
-                context.bot.sendMessage(chat_id=update.effective_chat.id,
-                                        text=f'{update.effective_user.first_name} ({update.effective_user.id}) joined')
-                msg_turns = "Player turns :\n"
-                for player_id in games[update.effective_chat.id].player_turns:
-                    msg_turns += f'- {player_id}\n'
-                context.bot.sendMessage(chat_id=update.effective_chat.id, text=msg_turns)
-            else:
-                context.bot.sendMessage(chat_id=update.effective_chat.id,
-                                        text=f'Sorry {update.effective_user.first_name} ({update.effective_user.id}), you can\'t join the game right now')
+                context.bot.sendMessage(
+                    chat_id=update.effective_chat.id,
+                    reply_to_message_id=update.message.message_id,
+                    text=f'{update.effective_user.first_name}, please chat the bot first before joining to make sure the bot works properly'
+                )
 
 
 def unjoin(update: Update, context: CallbackContext) -> None:
@@ -214,6 +290,8 @@ def startgame(update: Update, context: CallbackContext) -> None:
                                     text=f'Game started ({update.effective_chat.id})')
             msglists = quartets_play(update.effective_user.id, update.effective_chat.id)
             for msg in msglists:
+                if type(msg["content"]) is Template:
+                    msg["content"] = change_game_placeholder(context.bot, msg["content"], msg["gamedata"])
                 if msg["type"] == "private":
                     context.bot.sendMessage(chat_id=msg["destination"], text=escape_for_markdown(msg["content"]),
                                             parse_mode=ParseMode.MARKDOWN_V2)
@@ -234,15 +312,28 @@ def ask(update: Update, context: CallbackContext) -> None:
                     kwartet_kwargs[cmd[1].lower()] = cmd[2]
                     msglists = quartets_play(update.effective_user.id, update.effective_chat.id, **kwartet_kwargs)
                     for msg in msglists:
+                        if type(msg["content"]) is Template:
+                            msg["content"] = change_game_placeholder(context.bot, msg["content"], msg["gamedata"])
                         if msg["type"] == "private":
                             context.bot.sendMessage(chat_id=msg["destination"], text=escape_for_markdown(msg["content"]),
                                                     parse_mode=ParseMode.MARKDOWN_V2)
                         else:
-                            context.bot.sendMessage(chat_id=update.effective_chat.id, text=msg["content"])
+                            context.bot.sendMessage(
+                                chat_id=update.effective_chat.id,
+                                text=msg["content"]
+                            )
                 else:
-                    context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Keyword error!')
+                    context.bot.sendMessage(
+                        chat_id=update.effective_chat.id,
+                        reply_to_message_id=update.message.message_id,
+                        text=f'Keyword error!'
+                    )
             else:
-                context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Incomplete command!')
+                context.bot.sendMessage(
+                    chat_id=update.effective_chat.id,
+                    reply_to_message_id=update.message.message_id,
+                    text=f'Incomplete command!'
+                )
         except AttributeError:  # Edited message
             pass
 
