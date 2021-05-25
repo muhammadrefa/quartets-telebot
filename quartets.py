@@ -13,10 +13,9 @@ class Quartets_GameState(enum.Enum):
 
 
 class QuartetsPlayer(object):
-    def __init__(self, deck: dict):
+    def __init__(self):
         self.cards = dict()
         self.group_finished = list()
-        self.deck = deck
 
     def cards_left(self) -> int:
         left = 0
@@ -85,11 +84,11 @@ class Quartets(object):
 
     def add_player(self, player_id: str) -> bool:
         if (self.state == Quartets_GameState.NOT_STARTED) and (len(self.players) < len(self.deck) - 2):
-            self.players[player_id] = QuartetsPlayer(self.deck)
+            self.players[player_id] = QuartetsPlayer()
             self.player_turns.append(player_id)
             return True
         elif len(self.drawing_deck) >= (4 + 4):  # At least 4 cards remaining after new player joined
-            self.players[player_id] = QuartetsPlayer(self.deck)
+            self.players[player_id] = QuartetsPlayer()
             self.player_turns.append(player_id)
             for i in range(0, 4):
                 self.draw(self.players[player_id])
@@ -122,11 +121,10 @@ class Quartets(object):
 
     def start_play(self):
         self.first_draw()
-        for id_pemain in self.players:
-            self.players[id_pemain].card_check_complete()
-            if not self.players[id_pemain].cards_left():
-                # self.pemain[id_pemain].kartu_cangkul(self.cangkulan)
-                self.draw(self.players[id_pemain])
+        for player_id in self.players:
+            self.players[player_id].card_check_complete()
+            if not self.players[player_id].cards_left():
+                self.draw(self.players[player_id])
 
     def play(self, **kwargs) -> dict:
         data = dict()
@@ -363,7 +361,6 @@ if __name__ == "__main__":
     permainan = Quartets(dek_kartu)
     permainan.add_player("Asep")
     permainan.add_player("Budi")
-    # permainan.bermain_prompt()
     permainan_kwargs = dict()
     result = dict()
 
