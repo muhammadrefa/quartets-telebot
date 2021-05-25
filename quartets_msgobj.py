@@ -5,12 +5,12 @@ from telegram import Bot
 
 class QuartetsMessage(object):
     def __init__(self):
-        self.send_to = None
+        self.destination = None
         self.reply_to = None
         self.message = str()
         self.template = None
 
-    def set_message(self, message: str, is_html: bool=False):
+    def set_message(self, message: str, is_html: bool = False):
         if not is_html:
             message = self.escape_html(message)
         self.message = message
@@ -42,7 +42,7 @@ class QuartetsCardList(object):
         for player_id in player_status:
             _msg = str()
             msg = QuartetsMessage()
-            msg.send_to = player_id
+            msg.destination = player_id
 
             if game_id is not None:
                 _msg += f'Game ID: {game_id}\nGroup: $GROUPNAME\n\n'

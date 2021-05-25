@@ -32,17 +32,15 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
     if str(user_id) == games[game_id].player_turns[games[game_id].idx_current_player_turn]\
             or games[game_id].state in [Quartets_GameState.NOT_STARTED, Quartets_GameState.FINISHED]:
         result = games[game_id].play(**kwargs)
-        # msglist.append({"type": "group", "content": f'State {games[game_id].state}'})
 
         if result["result"]["error"]:
             msg = QuartetsMessage()
-            msg.send_to = game_id
+            msg.destination = game_id
             try:
                 msg.set_message(f'Error! {result["result"]["errmsg"]}')
             except KeyError:
                 msg.set_message("Error!")
             msglist.append(msg)
-            # msglist.append({"type": "group", "content": errmsg})
 
         else:
             # if games[game_id].state is Quartets_GameState.NOT_STARTED:
@@ -51,14 +49,9 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
             if games[game_id].state is Quartets_GameState.CHOOSE_GROUP:
                 player_id = games[game_id].player_turns[games[game_id].idx_current_player_turn]
                 msg = QuartetsMessage()
-                msg.send_to = game_id
+                msg.destination = game_id
                 msg.set_template(f'Current player: $NAME1 (@$USERNAME1 {player_id})')
                 msglist.append(msg)
-                # msglist.append({
-                #     "type": "group",
-                #     "content": Template(msg),
-                #     "gamedata": {"NAME1": player_id, "USERNAME1": player_id, "ID1": player_id}
-                # })
 
                 try:
                     # print("Players data")
@@ -73,7 +66,7 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
                     pass
 
                 msg = QuartetsMessage()
-                msg.send_to = game_id
+                msg.destination = game_id
                 msg.set_message(
                     "Card list sent privately\n\n"
                     "Select group by using this command\n\n"
@@ -90,24 +83,19 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
                     gamedata["USERNAME" + str(i)] = k
                 _msg += f'\nSelect target player by using this command\n\n/ask target <owner id>'
                 msg = QuartetsMessage()
-                msg.send_to = game_id
+                msg.destination = game_id
                 msg.set_template(_msg)
                 msglist.append(msg)
-                # msglist.append({
-                #     "type": "group",
-                #     "content": Template(msg),
-                #     "gamedata": gamedata
-                # })
 
             elif games[game_id].state is Quartets_GameState.CHOOSE_CARD:
                 msg = QuartetsMessage()
-                msg.send_to = game_id
+                msg.destination = game_id
                 msg.set_message(f'Select card to ask using this command\n\n/ask cardname <card name>')
                 msglist.append(msg)
 
             elif games[game_id].state is Quartets_GameState.PLAYER_AGAIN:
                 msg = QuartetsMessage()
-                msg.send_to = game_id
+                msg.destination = game_id
                 msg.set_message(f'You\'ve got the card! Continue!')
                 msglist.append(msg)
 
@@ -122,12 +110,10 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
                     pass
 
                 msglist += quartets_play(user_id, game_id)
-                # for msg in quartets_play(user_id, game_id):
-                #     msglist.append(msg)
 
             elif games[game_id].state is Quartets_GameState.PLAYER_NEXT:
                 msg = QuartetsMessage()
-                msg.send_to = game_id
+                msg.destination = game_id
                 msg.set_message(
                     "Player switch!\n"
                     f'Reason: {result["result"]["msg"]}'
@@ -137,7 +123,7 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
                 new_msglist = quartets_play(user_id, game_id)
 
                 msg = QuartetsMessage()
-                msg.send_to = game_id
+                msg.destination = game_id
                 msg.set_message(f'Cards left in drawing deck: {len(games[game_id].drawing_deck)}')
                 msglist.append(msg)
 
@@ -150,30 +136,33 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
                     _msg += f'{player_id}\t{result["result"]["score"][player_id]}\t(left {result["result"]["left"][player_id]} cards)\n'
                 del games[game_id]
                 msg = QuartetsMessage()
-                msg.send_to = game_id
+                msg.destination = game_id
                 msg.set_message(_msg)
 
     else:
         player_id = games[game_id].player_turns[games[game_id].idx_current_player_turn]
         msg = QuartetsMessage()
-        msg.send_to = game_id
+        msg.destination = game_id
         msg.set_template(f'Not your turn! ($NAME\'s turn) (User ID {player_id})')
         msglist.append(msg)
-        # msglist.append({
-        #     "type": "group",
-        #     "content": Template(msg),
-        #     "gamedata": {"NAME": player_id}
-        # })
     return msglist
 
 
 def hi(update: Update, context: CallbackContext) -> None:
     try:
-        context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Hello {update.effective_user.first_name} ({update.effective_user.id}) from {update.effective_chat.id}')
-        context.bot.sendMessage(chat_id=update.effective_user.id, text=f'Hello {update.effective_user.first_name}')
+        context.bot.sendMessage(
+            chat_id=update.effective_chat.id,
+            text=f'Hello {update.effective_user.first_name} ({update.effective_user.id}) from {update.effective_chat.id}'
+        )
+        context.bot.sendMessage(
+            chat_id=update.effective_user.id,
+            text=f'Hello {update.effective_user.first_name}'
+        )
     except error.Unauthorized:
-        context.bot.sendMessage(chat_id=update.effective_chat.id,
-                                text=f'{update.effective_user.first_name}, please chat the bot first to make sure the bot works properly')
+        context.bot.sendMessage(
+            chat_id=update.effective_chat.id,
+            text=f'{update.effective_user.first_name}, please chat the bot first to make sure the bot works properly'
+        )
 
 
 def newgame(update: Update, context: CallbackContext) -> None:
@@ -303,7 +292,7 @@ def startgame(update: Update, context: CallbackContext) -> None:
                     msg.generate_message({})
                 print("msg", msg.message)
                 context.bot.sendMessage(
-                    chat_id=msg.send_to,
+                    chat_id=msg.destination,
                     text=msg.message,
                     parse_mode=ParseMode.HTML
                 )
@@ -325,7 +314,7 @@ def ask(update: Update, context: CallbackContext) -> None:
                         if not msg.message:
                             msg.generate_message({})
                         context.bot.sendMessage(
-                            chat_id=msg.send_to,
+                            chat_id=msg.destination,
                             text=msg.message,
                             parse_mode=ParseMode.HTML
                         )
@@ -357,7 +346,7 @@ def endgame(update: Update, context: CallbackContext) -> None:
             if not msg.message:
                 msg.generate_message({})
             context.bot.sendMessage(
-                chat_id=msg.send_to,
+                chat_id=msg.destination,
                 text=msg.message,
                 parse_mode=ParseMode.HTML
             )
