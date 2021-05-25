@@ -134,14 +134,14 @@ def quartets_play(user_id: int, game_id: int, **kwargs) -> list:
                 )
                 msglist.append(msg)
 
-                msglist += quartets_play(user_id, game_id)
-                # for msg in quartets_play(user_id, game_id):
-                #     msglist.append(msg)
+                new_msglist = quartets_play(user_id, game_id)
 
                 msg = QuartetsMessage()
                 msg.send_to = game_id
                 msg.set_message(f'Cards left in drawing deck: {len(games[game_id].drawing_deck)}')
                 msglist.append(msg)
+
+                msglist += new_msglist
 
             elif games[game_id].state is Quartets_GameState.FINISHED:
                 _msg = f'Game finished!\n\n'
