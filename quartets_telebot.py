@@ -7,7 +7,7 @@ from quartets import Quartets, Quartets_GameState, dek_kartu, dek_baru
 from quartets_msgobj import QuartetsMessage, QuartetsCardList
 
 games = dict()
-admin_id = 0
+admin_id = None
 
 
 def change_game_placeholder(bot: Bot, msg: Template, gamedata: dict) -> str:
@@ -224,7 +224,7 @@ def join(update: Update, context: CallbackContext) -> None:
                         msg = QuartetsCardList.generate_message(games[update.effective_chat.id].deck, carddata, game_id=update.effective_chat.id)
                         context.bot.sendMessage(
                             chat_id=update.effective_user.id,
-                            text=msg[0].message,
+                            text=msg[0].get_message(),
                             parse_mode=ParseMode.HTML
                         )
                     context.bot.sendMessage(
@@ -290,10 +290,10 @@ def startgame(update: Update, context: CallbackContext) -> None:
             for msg in msglists:
                 if not msg.message:
                     msg.generate_message({})
-                print("msg", msg.message)
+                # print("msg", msg.message)
                 context.bot.sendMessage(
                     chat_id=msg.destination,
-                    text=msg.message,
+                    text=msg.get_message(),
                     parse_mode=ParseMode.HTML
                 )
 
@@ -315,7 +315,7 @@ def ask(update: Update, context: CallbackContext) -> None:
                             msg.generate_message({})
                         context.bot.sendMessage(
                             chat_id=msg.destination,
-                            text=msg.message,
+                            text=msg.get_message(),
                             parse_mode=ParseMode.HTML
                         )
                 else:
@@ -347,7 +347,7 @@ def endgame(update: Update, context: CallbackContext) -> None:
                 msg.generate_message({})
             context.bot.sendMessage(
                 chat_id=msg.destination,
-                text=msg.message,
+                text=msg.get_message(),
                 parse_mode=ParseMode.HTML
             )
 
@@ -381,28 +381,32 @@ def help(update: Update, context: CallbackContext) -> None:
 
 
 def admin(update: Update, context: CallbackContext) -> None:
-    if update.effective_chat.id == admin_id:
-        cmd = update.message.text.split(" ", 2)
-        if len(cmd) > 1:
-            if cmd[1] == "gamelists":
-                context.bot.sendMessage(chat_id=update.effective_chat.id, text=str(list(games)))
-            elif cmd[1] == "deletegame":
-                try:
-                    del games[int(cmd[2])]
-                    context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Game ID {cmd[2]} deleted')
-                except IndexError:
-                    context.bot.sendMessage(chat_id=update.effective_chat.id, text="Send the game ID")
-                except KeyError:
-                    context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Wrong Game ID!')
-        else:
-            context.bot.sendMessage(chat_id=update.effective_chat.id, text="Yes, you are admin")
+    if admin_id is not None:
+        if update.effective_chat.id == admin_id:
+            cmd = update.message.text.split(" ", 2)
+            if len(cmd) > 1:
+                if cmd[1] == "gamelists":
+                    context.bot.sendMessage(chat_id=update.effective_chat.id, text=str(list(games)))
+                elif cmd[1] == "deletegame":
+                    try:
+                        del games[int(cmd[2])]
+                        context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Game ID {cmd[2]} deleted')
+                    except IndexError:
+                        context.bot.sendMessage(chat_id=update.effective_chat.id, text="Send the game ID")
+                    except KeyError:
+                        context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Wrong Game ID!')
+            else:
+                context.bot.sendMessage(chat_id=update.effective_chat.id, text="Yes, you are admin")
 
 
 if __name__ == "__main__":
     telebot_cfg = configparser.ConfigParser()
     telebot_cfg.read("telebot.cfg")
 
-    admin_id = int(telebot_cfg["telebot"]["admin"])
+    try:
+        admin_id = int(telebot_cfg["telebot"]["admin"])
+    except ValueError:
+        admin_id = None
     updater = Updater(telebot_cfg["telebot"]["token"])
 
     updater.dispatcher.add_handler(CommandHandler('hi', hi))
@@ -416,5 +420,5 @@ if __name__ == "__main__":
     updater.dispatcher.add_handler(CommandHandler('help', help))
     updater.dispatcher.add_handler(CommandHandler('admin', admin))
 
-    updater.start_polling()
+    updater.start_polling(drop_pending_updates=True)
     updater.idle()
