@@ -9,10 +9,10 @@ class QuartetsMessage(object):
         self.reply_to = None
         self.message = str()
         self.template = None
+        self.is_html = False
 
     def set_message(self, message: str, is_html: bool = False):
-        if not is_html:
-            message = self.escape_html(message)
+        self.is_html = is_html
         self.message = message
 
     def set_template(self, template: str):
@@ -21,6 +21,12 @@ class QuartetsMessage(object):
     def generate_message(self, template_data: dict):
         self.message = self.template.safe_substitute(template_data)
         return self.message
+
+    def get_message(self):
+        message = self.message
+        if not self.is_html:
+            message = self.escape_html(message)
+        return message
 
     @staticmethod
     def escape_html(msg: str):
@@ -57,5 +63,6 @@ class QuartetsCardList(object):
                             _msg += f'- {card}\n'
             _msg += f'\nFinished groups : {len(player_status[player_id]["group_finished"])}'
             msg.set_template(_msg)
+            msg.is_html = True
             msglist.append(msg)
         return msglist
