@@ -24,6 +24,8 @@ class QuartetsMessage(object):
 
     def get_message(self):
         message = self.message
+        if not message:
+            message = self.generate_message({})
         if not self.is_html:
             message = self.escape_html(message)
         return message
@@ -43,15 +45,16 @@ class QuartetsCardList(object):
         pass
 
     @staticmethod
-    def generate_message(deck: dict, player_status: dict, game_id: int = None) -> list:
+    def generate_message(deck: dict, player_status: dict, gamedata: dict = None) -> list:
         msglist = list()
         for player_id in player_status:
             _msg = str()
             msg = QuartetsMessage()
             msg.destination = player_id
 
-            if game_id is not None:
-                _msg += f'Game ID: {game_id}\nGroup: $GROUPNAME\n\n'
+            if gamedata is not None:
+                header = f'Game ID: {gamedata["group"]["id"]}\nGroup: {gamedata["group"]["name"]}\n\n'
+                _msg += QuartetsMessage.escape_html(header)
             _msg += "Card data\n\n"
             for group in deck:
                 if group in player_status[player_id]['cards']:
