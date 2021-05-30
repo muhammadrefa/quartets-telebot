@@ -109,7 +109,10 @@ class QuartetsTelebotGame(object):
                 elif self.game.state is Quartets_GameState.CHOOSE_PLAYER:
                     _msg = "Owners :\n"
                     for i, k in enumerate(result["result"]["owner"]):
-                        _msg += f'- {self.player_data[k]["name"]} ({self.player_data[k]["username"]} {k})\n'
+                        if self.player_data[k]["username"] is not None:
+                            _msg += f'- {self.player_data[k]["name"]} ({self.player_data[k]["username"]} {k})\n'
+                        else:
+                            _msg += f'- {self.player_data[k]["name"]} ({k})\n'
                     _msg += f'\nSelect target player by using this command\n\n/ask target <owner id>'
                     msg = QuartetsMessage()
                     msg.destination = self.group_data["id"]
@@ -159,13 +162,19 @@ class QuartetsTelebotGame(object):
                     msglist += new_msglist
 
                 elif self.game.state is Quartets_GameState.FINISHED:
+                    _msgdata = dict()
                     _msg = f'Game finished!\n\n'
                     _msg += f'Scores :\n'
-                    for player_id in result["result"]["score"]:
-                        _msg += f'{player_id}\t{result["result"]["score"][player_id]}\t(left {result["result"]["left"][player_id]} cards)\n'
+                    for i, player_id in enumerate(result["result"]["score"]):
+                        _msg += f'$NAME{str(i)} ($USERID{str(i)})\t$SCORE{str(i)}\t(left $LEFT{str(i)} cards)\n'
+                        _msgdata["NAME" + str(i)] = self.player_data[player_id]["name"]
+                        _msgdata["USERID" + str(i)] = player_id
+                        _msgdata["SCORE" + str(i)] = result["result"]["score"][player_id]
+                        _msgdata["LEFT" + str(i)] = result["result"]["left"][player_id]
                     msg = QuartetsMessage()
                     msg.destination = self.group_data["id"]
-                    msg.set_message(_msg)
+                    msg.set_template(_msg)
+                    msg.generate_message(_msgdata)
                     msglist.append(msg)
 
         else:

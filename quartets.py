@@ -236,7 +236,10 @@ class Quartets(object):
                         # print(data["result"]["status"])
 
                         data["result"]["received"] = True
-                        self.state = Quartets_GameState.PLAYER_AGAIN
+                        if not len(self.drawing_deck):
+                            self.state = Quartets_GameState.FINISHED
+                        else:
+                            self.state = Quartets_GameState.PLAYER_AGAIN
                     else:
                         self.state = Quartets_GameState.PLAYER_NEXT
                         data["result"]["msg"] = "Wrong card!"
@@ -245,6 +248,12 @@ class Quartets(object):
                 if data["result"]["error"]:
                     data["result"]["errmsg"] = "Invalid card name!"
 
+        self.players[self.player_turns[self.idx_current_player_turn]].card_check_complete()
+        if not len(self.current_player().cards) and len(self.drawing_deck):
+            self.draw(self.current_player())
+            if not len(self.drawing_deck):
+                self.state = Quartets_GameState.FINISHED
+
         if self.state == Quartets_GameState.FINISHED:
             data["result"]["score"] = dict()
             data["result"]["left"] = dict()
@@ -252,10 +261,6 @@ class Quartets(object):
                 data["result"]["score"][player_id] = len(self.players[player_id].group_finished)
                 data["result"]["left"][player_id] = self.players[player_id].cards_left()
             data["result"]["error"] = False
-
-        self.players[self.player_turns[self.idx_current_player_turn]].card_check_complete()
-        if not len(self.current_player().cards) and len(self.drawing_deck):
-            self.draw(self.current_player())
 
         data["current_player"] = self.current_player_id()
         data["result"]["status"][self.current_player_id()] = self.player_status(self.current_player_id())
