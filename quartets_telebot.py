@@ -79,7 +79,7 @@ class QuartetsTelebotGame(object):
                     msg.generate_message(
                         {
                             "NAME": self.player_data[player_id]["name"],
-                            "USERNAME": self.player_data[player_id]["username"] if not None else "",
+                            "USERNAME": self.player_data[player_id]["username"] if self.player_data[player_id]["username"] is not None else "",
                             "ID": player_id
                         }
                     )
@@ -166,6 +166,7 @@ class QuartetsTelebotGame(object):
                     msg = QuartetsMessage()
                     msg.destination = self.group_data["id"]
                     msg.set_message(_msg)
+                    msglist.append(msg)
 
         else:
             player_id = self.game.current_player_id()
@@ -395,7 +396,6 @@ def ask(update: Update, context: CallbackContext) -> None:
 
 
 def endgame(update: Update, context: CallbackContext) -> None:
-    # TODO : Send score after game ends (/endgame)
     # print("end :: Games", games)
     if update.effective_chat.id not in games:
         context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'No game existed!')

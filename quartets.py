@@ -87,7 +87,8 @@ class Quartets(object):
             self.players[player_id] = QuartetsPlayer()
             self.player_turns.append(player_id)
             return True
-        elif len(self.drawing_deck) >= (4 + 4):  # At least 4 cards remaining after new player joined
+        # At least 4 cards remaining after new player joined
+        elif (self.state != Quartets_GameState.NOT_STARTED) and (len(self.drawing_deck) >= (4 + 4)):
             self.players[player_id] = QuartetsPlayer()
             self.player_turns.append(player_id)
             for i in range(0, 4):
@@ -147,8 +148,8 @@ class Quartets(object):
         data = dict()
         data["result"] = {"error": True, "status": dict()}
 
-        if not len(self.drawing_deck):
-            self.state = Quartets_GameState.FINISHED
+        # if not len(self.drawing_deck):
+        #     self.state = Quartets_GameState.FINISHED
 
         if self.state == Quartets_GameState.NOT_STARTED:
             self.start_play()
@@ -172,7 +173,10 @@ class Quartets(object):
                 self.idx_current_player_turn = 0
             # print(f'Switch player to {self.player_turns[self.idx_current_player_turn]}')
             data["result"]["error"] = False
-            self.state = Quartets_GameState.CHOOSE_GROUP
+            if not len(self.drawing_deck):
+                self.state = Quartets_GameState.FINISHED
+            else:
+                self.state = Quartets_GameState.CHOOSE_GROUP
 
         if self.state == Quartets_GameState.CHOOSE_GROUP:
             try:
