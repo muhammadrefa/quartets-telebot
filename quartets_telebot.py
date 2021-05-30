@@ -113,7 +113,10 @@ class QuartetsTelebotGame(object):
                             _msg += f'- {self.player_data[k]["name"]} ({self.player_data[k]["username"]} {k})\n'
                         else:
                             _msg += f'- {self.player_data[k]["name"]} ({k})\n'
-                    _msg += f'\nSelect target player by using this command\n\n/ask target <owner id>'
+                    _msg += f'\nSelect target player by using this command\n\n' \
+                            f'/ask target <owner id>\n' \
+                            f'or\n' \
+                            f'/ask target <username>'
                     msg = QuartetsMessage()
                     msg.destination = self.group_data["id"]
                     msg.set_template(_msg)
@@ -378,6 +381,16 @@ def ask(update: Update, context: CallbackContext) -> None:
             if len(cmd) > 2:
                 keywords = ["group", "target", "cardname"]
                 if cmd[1].lower() in keywords:
+                    if cmd[1].lower() == "target":
+                        # Convert usernames to user id
+                        if cmd[2] not in games[update.effective_chat.id].player_data:
+                            if cmd[2][0] == "@":
+                                cmd[2] = cmd[2][1:]
+                            # Iterate all players
+                            for player_id in games[update.effective_chat.id].player_data:
+                                if games[update.effective_chat.id].player_data[player_id]["username"] == cmd[2]:
+                                    cmd[2] = player_id
+                                    break
                     quartets_kwargs[cmd[1].lower()] = cmd[2]
                     msglists = games[update.effective_chat.id].play(update.effective_user.id, **quartets_kwargs)
                     for msg in msglists:
