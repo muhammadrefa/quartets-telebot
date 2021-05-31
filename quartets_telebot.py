@@ -209,7 +209,15 @@ def hi(update: Update, context: CallbackContext) -> None:
     except error.Unauthorized:
         context.bot.sendMessage(
             chat_id=update.effective_chat.id,
-            text=f'{update.effective_user.first_name}, please chat the bot first to make sure the bot works properly'
+            text=f'{update.effective_user.first_name}, please chat the bot privately first to make sure the bot works properly'
+        )
+
+
+def start(update: Update, context: CallbackContext) -> None:
+    if update.effective_chat.id == update.effective_user.id:
+        context.bot.sendMessage(
+            chat_id=update.effective_user.id,
+            text=f'Hi {update.effective_user.first_name}!'
         )
 
 
@@ -311,7 +319,7 @@ def join(update: Update, context: CallbackContext) -> None:
                 context.bot.sendMessage(
                     chat_id=update.effective_chat.id,
                     reply_to_message_id=update.message.message_id,
-                    text=f'{update.effective_user.first_name}, please chat the bot first before joining to make sure the bot works properly'
+                    text=f'{update.effective_user.first_name}, please chat the bot privately first before joining to make sure the bot works properly'
                 )
 
 
@@ -388,7 +396,7 @@ def ask(update: Update, context: CallbackContext) -> None:
                                 cmd[2] = cmd[2][1:]
                             # Iterate all players
                             for player_id in games[update.effective_chat.id].player_data:
-                                if games[update.effective_chat.id].player_data[player_id]["username"] == cmd[2]:
+                                if games[update.effective_chat.id].player_data[player_id]["username"].lower() == cmd[2].lower():
                                     cmd[2] = player_id
                                     break
                     quartets_kwargs[cmd[1].lower()] = cmd[2]
@@ -491,6 +499,7 @@ if __name__ == "__main__":
         admin_id = None
     updater = Updater(telebot_cfg["telebot"]["token"])
 
+    updater.dispatcher.add_handler(CommandHandler('start', start))
     updater.dispatcher.add_handler(CommandHandler('hi', hi))
     updater.dispatcher.add_handler(CommandHandler('newgame', newgame))
     updater.dispatcher.add_handler(CommandHandler('join', join))
