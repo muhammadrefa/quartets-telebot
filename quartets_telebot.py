@@ -1,9 +1,9 @@
 import configparser
+import quartets_deck
 
-from string import Template
-from telegram import Update, error, ParseMode, Bot
+from telegram import Update, error, ParseMode
 from telegram.ext import Updater, CommandHandler, CallbackContext
-from quartets import Quartets, Quartets_GameState, dek_kartu, dek_baru
+from quartets import Quartets, QuartetsGameState
 from quartets_msgobj import QuartetsMessage, QuartetsCardList
 
 games = dict()
@@ -12,7 +12,8 @@ admin_id = None
 
 class QuartetsTelebotGame(object):
     def __init__(self, deck):
-        self.game = Quartets(deck)
+        self.deck = deck
+        self.game = Quartets(self.deck)
         self.group_data = dict()
         self.player_data = dict()
 
@@ -55,7 +56,7 @@ class QuartetsTelebotGame(object):
         msglist = list()
         # print("quartets play")
         if str(user_id) == str(self.game.current_player_id())\
-                or self.game.state in [Quartets_GameState.NOT_STARTED, Quartets_GameState.FINISHED]:
+                or self.game.state in [QuartetsGameState.NOT_STARTED, QuartetsGameState.FINISHED]:
             result = self.game.play(**kwargs)
 
             if result["result"]["error"]:
@@ -71,7 +72,7 @@ class QuartetsTelebotGame(object):
                 # if games[game_id]["game"].state is Quartets_GameState.NOT_STARTED:
                 #     msglist.append({"type": "group", "content": "Game not started yet"})
 
-                if self.game.state is Quartets_GameState.CHOOSE_GROUP:
+                if self.game.state is QuartetsGameState.CHOOSE_GROUP:
                     player_id = self.game.current_player_id()
                     msg = QuartetsMessage()
                     msg.destination = self.group_data["id"]
@@ -106,7 +107,7 @@ class QuartetsTelebotGame(object):
                     )
                     msglist.append(msg)
 
-                elif self.game.state is Quartets_GameState.CHOOSE_PLAYER:
+                elif self.game.state is QuartetsGameState.CHOOSE_PLAYER:
                     _msg = "Owners :\n"
                     for i, k in enumerate(result["result"]["owner"]):
                         if self.player_data[k]["username"] is not None:
@@ -122,13 +123,13 @@ class QuartetsTelebotGame(object):
                     msg.set_template(_msg)
                     msglist.append(msg)
 
-                elif self.game.state is Quartets_GameState.CHOOSE_CARD:
+                elif self.game.state is QuartetsGameState.CHOOSE_CARD:
                     msg = QuartetsMessage()
                     msg.destination = self.group_data["id"]
                     msg.set_message(f'Select card to ask using this command\n\n/ask cardname <card name>')
                     msglist.append(msg)
 
-                elif self.game.state is Quartets_GameState.PLAYER_AGAIN:
+                elif self.game.state is QuartetsGameState.PLAYER_AGAIN:
                     msg = QuartetsMessage()
                     msg.destination = self.group_data["id"]
                     msg.set_message(f'You\'ve got the card! Continue!')
@@ -146,7 +147,7 @@ class QuartetsTelebotGame(object):
 
                     msglist += self.play(user_id)
 
-                elif self.game.state is Quartets_GameState.PLAYER_NEXT:
+                elif self.game.state is QuartetsGameState.PLAYER_NEXT:
                     msg = QuartetsMessage()
                     msg.destination = self.group_data["id"]
                     msg.set_message(
@@ -164,7 +165,7 @@ class QuartetsTelebotGame(object):
 
                     msglist += new_msglist
 
-                elif self.game.state is Quartets_GameState.FINISHED:
+                elif self.game.state is QuartetsGameState.FINISHED:
                     _msgdata = dict()
                     _msg = f'Game finished!\n\n'
                     _msg += f'Scores :\n'
@@ -229,7 +230,7 @@ def newgame(update: Update, context: CallbackContext) -> None:
             text=f'Game not created! Don\'t do it privately!'
         )
     elif update.effective_chat.id not in games:
-        games[update.effective_chat.id] = QuartetsTelebotGame(dek_baru)
+        games[update.effective_chat.id] = QuartetsTelebotGame(quartets_deck.deck_used)
         games[update.effective_chat.id].group_data = {
             "id": update.effective_chat.id,
             "name": update.effective_chat.title
@@ -259,7 +260,7 @@ def join(update: Update, context: CallbackContext) -> None:
                 reply_to_message_id=update.message.message_id,
                 text=f'{update.effective_user.first_name} ({update.effective_user.id}) already joined!'
             )
-        elif len(games[update.effective_chat.id].game.player_turns) >= len(dek_baru) - 2:
+        elif len(games[update.effective_chat.id].game.player_turns) >= len(games[update.effective_chat.id].deck) - 2:
             context.bot.sendMessage(
                 chat_id=update.effective_chat.id,
                 reply_to_message_id=update.message.message_id,
@@ -280,7 +281,7 @@ def join(update: Update, context: CallbackContext) -> None:
                         }
                 ):
                     # Send card data
-                    if games[update.effective_chat.id].game.state != Quartets_GameState.NOT_STARTED:
+                    if games[update.effective_chat.id].game.state != QuartetsGameState.NOT_STARTED:
                         carddata = games[update.effective_chat.id].game.player_status(str(update.effective_user.id))
                         msg = QuartetsCardList.generate_message(
                             games[update.effective_chat.id].game.deck,
@@ -421,7 +422,7 @@ def ask(update: Update, context: CallbackContext) -> None:
                 )
         except AttributeError:  # Edited message
             pass
-    if games[update.effective_chat.id].game.state == Quartets_GameState.FINISHED:
+    if games[update.effective_chat.id].game.state == QuartetsGameState.FINISHED:
         del games[update.effective_chat.id]
 
 
@@ -431,7 +432,7 @@ def endgame(update: Update, context: CallbackContext) -> None:
         context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'No game existed!')
     else:
         context.bot.sendMessage(chat_id=update.effective_chat.id, text=f'Ending game...')
-        games[update.effective_chat.id].game.state = Quartets_GameState.FINISHED
+        games[update.effective_chat.id].game.state = QuartetsGameState.FINISHED
         msglists = games[update.effective_chat.id].play(update.effective_user.id)
         for msg in msglists:
             context.bot.sendMessage(

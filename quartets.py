@@ -2,7 +2,7 @@ import enum
 import random
 
 
-class Quartets_GameState(enum.Enum):
+class QuartetsGameState(enum.Enum):
     NOT_STARTED = enum.auto()
     CHOOSE_GROUP = enum.auto()
     CHOOSE_PLAYER = enum.auto()
@@ -77,18 +77,18 @@ class Quartets(object):
         self.idx_current_player_turn = 0
         self.id_player_target = -1
         self.current_category = str()
-        self.state = Quartets_GameState.NOT_STARTED
+        self.state = QuartetsGameState.NOT_STARTED
         for group in deck:
             for cardname in deck[group]:
                 self.drawing_deck.append({"group": group, "name": cardname})
 
     def add_player(self, player_id: str) -> bool:
-        if (self.state == Quartets_GameState.NOT_STARTED) and (len(self.players) < len(self.deck) - 2):
+        if (self.state == QuartetsGameState.NOT_STARTED) and (len(self.players) < len(self.deck) - 2):
             self.players[player_id] = QuartetsPlayer()
             self.player_turns.append(player_id)
             return True
         # At least 4 cards remaining after new player joined
-        elif (self.state != Quartets_GameState.NOT_STARTED) and (len(self.drawing_deck) >= (4 + 4)):
+        elif (self.state != QuartetsGameState.NOT_STARTED) and (len(self.drawing_deck) >= (4 + 4)):
             self.players[player_id] = QuartetsPlayer()
             self.player_turns.append(player_id)
             for i in range(0, 4):
@@ -98,7 +98,7 @@ class Quartets(object):
             return False
 
     def remove_player(self, player_id: str) -> bool:
-        if len(self.players) > 2 or self.state == Quartets_GameState.NOT_STARTED:
+        if len(self.players) > 2 or self.state == QuartetsGameState.NOT_STARTED:
             for group in self.players[player_id].cards:
                 for cardname in self.players[player_id].cards:
                     self.drawing_deck.append({"group": group, "name": cardname})
@@ -151,20 +151,20 @@ class Quartets(object):
         # if not len(self.drawing_deck):
         #     self.state = Quartets_GameState.FINISHED
 
-        if self.state == Quartets_GameState.NOT_STARTED:
+        if self.state == QuartetsGameState.NOT_STARTED:
             self.start_play()
             self.idx_current_player_turn = 0
             # print(f'Current player : {self.player_turns[self.idx_current_player_turn]}')
             for player_id in self.player_turns:
                 data["result"]["status"][player_id] = self.player_status(player_id)
             data["result"]["error"] = False
-            self.state = Quartets_GameState.CHOOSE_GROUP
+            self.state = QuartetsGameState.CHOOSE_GROUP
 
-        if self.state == Quartets_GameState.PLAYER_AGAIN:
+        if self.state == QuartetsGameState.PLAYER_AGAIN:
             data["result"]["error"] = False
-            self.state = Quartets_GameState.CHOOSE_GROUP
+            self.state = QuartetsGameState.CHOOSE_GROUP
 
-        if self.state == Quartets_GameState.PLAYER_NEXT:
+        if self.state == QuartetsGameState.PLAYER_NEXT:
             self.draw(self.current_player())
             data["result"]["status"][self.current_player_id()] = self.player_status(self.current_player_id())
 
@@ -174,15 +174,15 @@ class Quartets(object):
             # print(f'Switch player to {self.player_turns[self.idx_current_player_turn]}')
             data["result"]["error"] = False
             if not len(self.drawing_deck):
-                self.state = Quartets_GameState.FINISHED
+                self.state = QuartetsGameState.FINISHED
             else:
-                self.state = Quartets_GameState.CHOOSE_GROUP
+                self.state = QuartetsGameState.CHOOSE_GROUP
 
-        if self.state == Quartets_GameState.CHOOSE_GROUP:
+        if self.state == QuartetsGameState.CHOOSE_GROUP:
             try:
                 if kwargs["group"] in self.current_player().list_group():
                     self.current_category = kwargs["group"]
-                    self.state = Quartets_GameState.CHOOSE_PLAYER
+                    self.state = QuartetsGameState.CHOOSE_PLAYER
                     data["result"]["error"] = False
                 else:
                     raise KeyError
@@ -191,18 +191,18 @@ class Quartets(object):
                 if data["result"]["error"]:
                     data["result"]["errmsg"] = "Invalid group chosen!"
 
-        if self.state == Quartets_GameState.CHOOSE_PLAYER:
+        if self.state == QuartetsGameState.CHOOSE_PLAYER:
             data["result"]["owner"] = list()
             data["result"]["owner"] = self.check_group_owners(self.current_category)
             data["result"]["owner"].remove(self.current_player_id())
             if not data["result"]["owner"]:
-                self.state = Quartets_GameState.PLAYER_NEXT
+                self.state = QuartetsGameState.PLAYER_NEXT
                 data["result"]["msg"] = "No one have any cards belong to the group!"
             else:
                 try:
                     if kwargs["target"] in data["result"]["owner"]:
                         self.id_player_target = kwargs["target"]
-                        self.state = Quartets_GameState.CHOOSE_CARD
+                        self.state = QuartetsGameState.CHOOSE_CARD
                         data["result"]["error"] = False
                     else:
                         raise KeyError
@@ -210,7 +210,7 @@ class Quartets(object):
                     if data["result"]["error"]:
                         data["result"]["errmsg"] = "Invalid target player!"
 
-        if self.state == Quartets_GameState.CHOOSE_CARD:
+        if self.state == QuartetsGameState.CHOOSE_CARD:
             data["result"]["cards"] = dict()
             data["result"]["cards"] = {
                 "list": self.deck[self.current_category],
@@ -237,11 +237,11 @@ class Quartets(object):
 
                         data["result"]["received"] = True
                         if not len(self.drawing_deck):
-                            self.state = Quartets_GameState.FINISHED
+                            self.state = QuartetsGameState.FINISHED
                         else:
-                            self.state = Quartets_GameState.PLAYER_AGAIN
+                            self.state = QuartetsGameState.PLAYER_AGAIN
                     else:
-                        self.state = Quartets_GameState.PLAYER_NEXT
+                        self.state = QuartetsGameState.PLAYER_NEXT
                         data["result"]["msg"] = "Wrong card!"
                     data["result"]["error"] = False
                 else:
@@ -254,9 +254,9 @@ class Quartets(object):
         if not len(self.current_player().cards) and len(self.drawing_deck):
             self.draw(self.current_player())
             if not len(self.drawing_deck):
-                self.state = Quartets_GameState.FINISHED
+                self.state = QuartetsGameState.FINISHED
 
-        if self.state == Quartets_GameState.FINISHED:
+        if self.state == QuartetsGameState.FINISHED:
             data["result"]["score"] = dict()
             data["result"]["left"] = dict()
             for player_id in self.players:
@@ -276,154 +276,3 @@ class Quartets(object):
             if self.players[player_id].have_group(group):
                 owners.append(player_id)
         return owners
-
-    def play_prompt(self):
-        self.start_play()
-
-        while len(self.drawing_deck):
-            print("players total :", len(self.players))
-            for player_id in self.players:
-                continue_play = True
-                while continue_play:
-                    if len(self.drawing_deck):
-                        print("Current player (" + player_id + ")")
-
-                        group_owned = self.players[player_id].list_group()
-                        print("Groups :")
-                        for k in group_owned:
-                            print(k)
-                        group_asked = str()
-                        while group_asked not in group_owned:
-                            group_asked = input("Pilih kategori: ")
-
-                        card_owners = list()
-                        for other_player_id in self.players:
-                            if other_player_id == player_id:
-                                continue
-                            if self.players[other_player_id].have_group(group_asked):
-                                card_owners.append(other_player_id)
-
-                        if card_owners:
-                            print("Owners :", card_owners)
-                            target_id = str()
-                            while target_id not in card_owners:
-                                target_id = input("Target : ")
-
-                            cards_owned = self.players[player_id].list_cards(group_asked)
-                            print("Cards :")
-                            for k in self.deck[group_asked]:
-                                if k in cards_owned:
-                                    print(k + " (owned)")
-                                else:
-                                    print(k)
-
-                            card_asked = str()
-                            while card_asked not in self.deck[group_asked]:
-                                card_asked = input("Select card to take: ")
-
-                            if self.players[target_id].have_card({'group': group_asked, 'name': card_asked}):
-                                print("Card received!")
-                                self.players[target_id].card_give({
-                                    'group': group_asked,
-                                    'name': card_asked
-                                })
-                                self.players[player_id].card_take({'group': group_asked, 'name': card_asked})
-                                # Other player doesn't have card remaining
-                                if not len(self.players[target_id].cards) and len(self.drawing_deck):
-                                    self.draw(self.players[player_id])
-
-                            else:
-                                print("Wrong card!")
-                                self.draw(self.players[player_id])
-                                continue_play = False
-
-                        else:
-                            print("No one have any cards belong to the group!")
-                            self.draw(self.players[player_id])
-                            continue_play = False
-
-                        self.players[player_id].card_check_complete()
-
-                        if not len(self.players[player_id].cards) and len(self.drawing_deck):
-                            self.draw(self.players[player_id])
-                    else:
-                        break
-
-        print("Game finished!")
-        print("Score :")
-        for player_id in self.players:
-            print(player_id + '\t' + str(len(self.players[player_id].group_finished)))
-
-
-dek_kartu = {
-    "kategori 1": ["kartuA", "kartuB", "kartuC", "kartuD"],
-    "kategori 2": ["kartuE", "kartuF", "kartuG", "kartuH"],
-    "kategori 3": ["kartuI", "kartuJ", "kartuK", "kartuL"],
-    # "kategori 4": ["kartuM", "kartuN", "kartuO", "kartuP"],
-    # "kategori 5": ["kartuQ", "kartuR", "kartuS", "kartuT"],
-}
-
-dek_baru = {
-    "nasi": ["nasi goreng", "nasi uduk", "nasi kuning", "nasi kucing"],
-    "air": ["air putih", "air santan", "air susu", "air tajin"],
-    "benda lengkung": ["busur", "karet", "tampah", "jembatan"],
-    "minuman": ["kopi", "teh", "cincau", "boba"],
-    "sumber tenaga": ["listrik", "bensin", "matahari", "karbohidrat"],
-    "manisan": ["permen", "coklat", "gula", "tebu"],
-    "tempat tinggal": ["hotel", "apartemen", "rumah", "emperan"]
-}
-
-if __name__ == "__main__":
-    permainan = Quartets(dek_kartu)
-    permainan.add_player("Asep")
-    permainan.add_player("Budi")
-    permainan_kwargs = dict()
-    result = dict()
-
-    while permainan.state is not Quartets_GameState.FINISHED:
-        result = permainan.play(**permainan_kwargs)
-        permainan_kwargs = dict()
-        print("state", permainan.state)
-        print("Current player :", result["current_player"])
-
-        if result["result"]["error"]:
-            try:
-                print("Error!", result["result"]["errmsg"])
-            except KeyError:
-                print("Error!")
-
-        if permainan.state is Quartets_GameState.NOT_STARTED:
-            print("Game not started yet")
-
-        elif permainan.state is Quartets_GameState.CHOOSE_GROUP:
-            print("Group list")
-            for k in result["result"]["group"]:
-                print(k)
-            permainan_kwargs["group"] = input("Select group: ")
-
-        elif permainan.state is Quartets_GameState.CHOOSE_PLAYER:
-            print("Owners")
-            for k in result["result"]["owner"]:
-                print(k)
-            permainan_kwargs["target"] = input("Select target player: ")
-
-        elif permainan.state is Quartets_GameState.CHOOSE_CARD:
-            print("Cards belong to group " + permainan.current_category)
-            for k in result["result"]["cards"]["list"]:
-                if k in result["result"]["cards"]["owned"]:
-                    print(k + " (owned)")
-                else:
-                    print(k)
-            permainan_kwargs["cardname"] = input("Select card: ")
-
-        elif permainan.state is Quartets_GameState.PLAYER_AGAIN:
-            print("Continue!")
-
-        elif permainan.state is Quartets_GameState.PLAYER_NEXT:
-            print("Switch player!")
-            print("Reason:", result["result"]["msg"])
-
-    print("Game finished!")
-    print("Score :")
-    for player_id in result["result"]["score"]:
-        print(player_id + '\t' + str(result["result"]["score"][player_id]))
