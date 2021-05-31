@@ -244,6 +244,8 @@ class Quartets(object):
                         self.state = Quartets_GameState.PLAYER_NEXT
                         data["result"]["msg"] = "Wrong card!"
                     data["result"]["error"] = False
+                else:
+                    raise KeyError
             except KeyError:
                 if data["result"]["error"]:
                     data["result"]["errmsg"] = "Invalid card name!"
