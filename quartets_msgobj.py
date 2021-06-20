@@ -1,6 +1,5 @@
 from string import Template
-from quartets import Quartets
-from telegram import Bot
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove
 
 
 class QuartetsMessage(object):
@@ -10,6 +9,7 @@ class QuartetsMessage(object):
         self.message = str()
         self.template = None
         self.is_html = False
+        self.custom_keyboard = None
 
     def set_message(self, message: str, is_html: bool = False):
         self.is_html = is_html
@@ -29,6 +29,12 @@ class QuartetsMessage(object):
         if not self.is_html:
             message = self.escape_html(message)
         return message
+
+    def set_custom_keyboard(self, buttons: list, is_one_time=True, is_selective=True):
+        self.custom_keyboard = ReplyKeyboardMarkup(buttons, one_time_keyboard=is_one_time, selective=is_selective)
+
+    def remove_custom_keyboard(self):
+        self.custom_keyboard = ReplyKeyboardRemove()
 
     @staticmethod
     def escape_html(msg: str):

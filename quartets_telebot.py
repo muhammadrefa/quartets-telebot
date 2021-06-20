@@ -1,7 +1,7 @@
 import configparser
 import quartets_deck
 
-from telegram import Update, error, ParseMode
+from telegram import Update, error, ParseMode, ReplyKeyboardRemove
 from telegram.ext import Updater, CommandHandler, CallbackContext
 from quartets import Quartets, QuartetsGameState
 from quartets_msgobj import QuartetsMessage, QuartetsCardList
@@ -23,7 +23,8 @@ class QuartetsTelebotGame(object):
                 return False
             self.player_data[str(player_data["id"])] = {
                 "name": player_data["name"],
-                "username": player_data["username"]
+                "username": player_data["username"],
+                "joinmsgid": player_data["joinmsgid"]
             }
             if self.game.add_player(str(player_data["id"])):
                 return True
@@ -84,6 +85,7 @@ class QuartetsTelebotGame(object):
                             "ID": player_id
                         }
                     )
+                    msg.remove_custom_keyboard()
                     msglist.append(msg)
 
                     try:
@@ -105,6 +107,9 @@ class QuartetsTelebotGame(object):
                         "Select group by using this command\n\n"
                         "/ask group <group name>"
                     )
+                    msg.reply_to = self.player_data[player_id]["joinmsgid"]
+                    msg.set_custom_keyboard(list(map(list, zip(
+                        [f'/ask group {groupname}' for groupname in result["result"]["status"][player_id]['cards']]))))
                     msglist.append(msg)
 
                 elif self.game.state is QuartetsGameState.CHOOSE_PLAYER:
@@ -121,12 +126,20 @@ class QuartetsTelebotGame(object):
                     msg = QuartetsMessage()
                     msg.destination = self.group_data["id"]
                     msg.set_template(_msg)
+                    msg.reply_to = self.player_data[self.game.current_player_id()]["joinmsgid"]
+                    msg.set_custom_keyboard(list(map(list, zip(
+                        [f'/ask target {self.player_data[target]["username"] if self.player_data[target]["username"] is not None else target}'
+                         for target in result["result"]["owner"]])))
+                    )
                     msglist.append(msg)
 
                 elif self.game.state is QuartetsGameState.CHOOSE_CARD:
                     msg = QuartetsMessage()
                     msg.destination = self.group_data["id"]
                     msg.set_message(f'Select card to ask using this command\n\n/ask cardname <card name>')
+                    msg.reply_to = self.player_data[self.game.current_player_id()]["joinmsgid"]
+                    msg.set_custom_keyboard(list(map(list, zip(
+                        [f'/ask cardname {cardname}' for cardname in self.game.deck[self.game.current_category]]))))
                     msglist.append(msg)
 
                 elif self.game.state is QuartetsGameState.PLAYER_AGAIN:
@@ -179,6 +192,7 @@ class QuartetsTelebotGame(object):
                     msg.destination = self.group_data["id"]
                     msg.set_template(_msg)
                     msg.generate_message(_msgdata)
+                    msg.remove_custom_keyboard()
                     msglist.append(msg)
 
         else:
@@ -201,11 +215,13 @@ def hi(update: Update, context: CallbackContext) -> None:
     try:
         context.bot.sendMessage(
             chat_id=update.effective_chat.id,
-            text=f'Hello {update.effective_user.first_name} ({update.effective_user.id}) from {update.effective_chat.id}'
+            text=f'Hello {update.effective_user.first_name} ({update.effective_user.id}) from {update.effective_chat.id}',
+            reply_markup=ReplyKeyboardRemove()
         )
         context.bot.sendMessage(
             chat_id=update.effective_user.id,
-            text=f'Hello {update.effective_user.first_name}'
+            text=f'Hello {update.effective_user.first_name}',
+            reply_markup=ReplyKeyboardRemove()
         )
     except error.Unauthorized:
         context.bot.sendMessage(
@@ -277,7 +293,8 @@ def join(update: Update, context: CallbackContext) -> None:
                         {
                             "id": update.effective_user.id,
                             "name": update.effective_user.full_name,
-                            "username": update.effective_user.username
+                            "username": update.effective_user.username,
+                            "joinmsgid": update.effective_message.message_id
                         }
                 ):
                     # Send card data
@@ -320,7 +337,7 @@ def join(update: Update, context: CallbackContext) -> None:
                 context.bot.sendMessage(
                     chat_id=update.effective_chat.id,
                     reply_to_message_id=update.message.message_id,
-                    text=f'{update.effective_user.first_name}, please chat the bot privately first before joining to make sure the bot works properly'
+                    text=f'{update.effective_user.first_name}, please chat the bot privately first before joining to make sure the bot works properly, and then rejoining the game'
                 )
 
 
@@ -375,8 +392,10 @@ def startgame(update: Update, context: CallbackContext) -> None:
             for msg in msglists:
                 context.bot.sendMessage(
                     chat_id=msg.destination,
+                    reply_to_message_id=msg.reply_to,
                     text=msg.get_message(),
-                    parse_mode=ParseMode.HTML
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=msg.custom_keyboard
                 )
 
 
@@ -405,14 +424,17 @@ def ask(update: Update, context: CallbackContext) -> None:
                     for msg in msglists:
                         context.bot.sendMessage(
                             chat_id=msg.destination,
+                            reply_to_message_id=msg.reply_to,
                             text=msg.get_message(),
-                            parse_mode=ParseMode.HTML
+                            parse_mode=ParseMode.HTML,
+                            reply_markup=msg.custom_keyboard
                         )
                 else:
                     context.bot.sendMessage(
                         chat_id=update.effective_chat.id,
                         reply_to_message_id=update.message.message_id,
                         text=f'Keyword error!'
+
                     )
             else:
                 context.bot.sendMessage(
@@ -438,7 +460,8 @@ def endgame(update: Update, context: CallbackContext) -> None:
             context.bot.sendMessage(
                 chat_id=msg.destination,
                 text=msg.get_message(),
-                parse_mode=ParseMode.HTML
+                parse_mode=ParseMode.HTML,
+                reply_markup=msg.custom_keyboard
             )
         del games[update.effective_chat.id]
 
